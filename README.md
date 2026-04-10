@@ -10,23 +10,38 @@ https://github.com/user-attachments/assets/acdb0141-daa7-40ca-be27-b72654e20138
 
 ---
 
-## Task 1: Data Preparation & Enrichment
+## Repository Structure
 
-### Part 1 — Data Preprocessing
+```
+Aetna_Assignment/
+├── db/                        # SQLite databases (original + processed)
+├── movie-deploy/              # Deployment files (Dockerfile, k8s manifests)
+├── Data_Prep.ipynb            # Step 1: Data preprocessing & sampling
+├── Data_Enrich.ipynb          # Step 2: LLM-based data enrichment
+├── Model_Build.ipynb          # Step 3: System design, evaluation & iteration
+├── index.html                 # Frontend UI
+├── eval_dataset.json          # Auto-generated evaluation test cases
+├── eval_results.json          # Model grading results
+├── .gitignore
+├── LICENSE
+└── README.md
+```
 
-> Notebook: `Data_Prep.ipynb`
+---
 
-**The Problem:** Two SQLite databases were provided — `movies.db` (45,430 movies × 12 columns) and `ratings.db` (100,004 ratings × 5 columns). The task required working with a sample of 50–100 movies, so instead of backfilling missing values, I took an aggressive noise-elimination approach. With 45K records to work with, I could afford to drop anything imperfect and still end up with a clean, high-quality sample.
+## Step 1: Data Preprocessing
 
-#### Movies Table Cleaning
+> `Data_Prep.ipynb`
 
-**Null check:** The `language` column was entirely null (45,430 nulls across all rows). Dropped the entire column as it carried no information.
+I started by importing both datasets — `movies.db` (45,430 movies × 12 columns) and `ratings.db` (100,004 ratings × 5 columns). Since the task only required a sample of 50–100 movies, I decided early on that the best strategy was aggressive noise elimination rather than backfilling. With 45K records to work with, I had more than enough headroom to drop anything imperfect and still end up with a clean, high-quality sample.
 
-**Hidden data quality issues:** The initial `.isnull()` check passed for most columns, but a deeper inspection revealed problems that nulls don't catch — empty strings in `imdbId`, `overview`, and `releaseDate`; empty JSON arrays `[]` in `productionCompanies` and `genres`; and zero values in `budget` and `revenue` that represented missing data rather than actual zeros.
+### Cleaning the Movies Table
 
-**Duplicate check:** `movieId` had 0 duplicates. `imdbId` had 16 duplicates — all were empty strings (movies without IMDb links), caught during empty string removal.
+The first thing I did was check for nulls across all columns. Everything came back clean except the `language` column, which had 45,430 nulls — every single row. The entire column was empty, so I dropped it immediately.
 
-**Column-by-column cleaning:**
+But nulls only tell part of the story. When I inspected the duplicate `imdbId` values, I noticed they weren't actually duplicates — they were empty strings that passed the null check. This prompted me to look deeper. I found empty strings hiding in `imdbId`, `overview`, and `releaseDate`. I found empty JSON arrays `[]` in `productionCompanies` and `genres`. And I found zeros in `budget` and `revenue` that weren't real zeros — they were missing data disguised as zeros. A movie with a budget of $0 and revenue of $0 isn't a real data point; it's noise.
+
+I went column by column and removed every record that had any of these issues:
 
 | Column | Issue | Removed | Remaining |
 |--------|-------|---------|-----------|
@@ -38,42 +53,46 @@ https://github.com/user-attachments/assets/acdb0141-daa7-40ca-be27-b72654e20138
 | `productionCompanies` | 177 empty `[]` | 177 | 5,187 |
 | `runtime` | 0 issues | 0 | 5,187 |
 | `genres` | 1 empty `[]` | 1 | 5,186 |
-| `status` | 2 non-Released (Rumored, Post Production) | 2 | **5,184** |
+| `status` | 2 non-Released | 2 | **5,184** |
 
-**Why this approach:** Ideally, we would backfill missing budgets and revenues using external APIs or estimation models. But since the task only required 50–100 movies, eliminating noise was the faster and cleaner path — we had more than enough clean records to sample from.
+The biggest drop came from removing zero-budget movies (36,535 records). In a production environment, I would have built a backfilling strategy — perhaps using external APIs like TMDb to fetch missing budgets, or training a regression model to estimate them from genre, year, and production company. But for a 100-movie sample, elimination was the right call.
 
-#### Ratings Table Cleaning
+I also removed 2 movies with a status of "Rumored" and "Post Production" since they weren't actually released films.
 
-**Basic stats:** 100,004 ratings from 671 unique users across 9,066 unique movies. Rating range: 0.5–5.0, average: 3.54. No nulls, no duplicates.
+### Cleaning the Ratings Table
 
-**Outlier removal:** Even though the data looked clean, I used normal distribution analysis to identify movies at the extreme ends of the rating spectrum — movies with unusually high or low numbers of ratings that could skew the sample. After removing outliers, the remaining ratings represented approximately **8,370 unique movies**.
+The ratings data was cleaner from the start — 100,004 ratings from 671 unique users across 9,066 unique movies. No nulls, no duplicates, rating range 0.5–5.0 with an average of 3.54.
 
-#### Building the Final Sample
+However, there was still a risk of outliers skewing the sample. Some movies had an unusually high number of ratings while others had very few. I used a normal distribution analysis to identify movies at the extreme ends of the rating count spectrum and removed them. After filtering, the remaining ratings represented approximately **8,370 unique movies** within a statistically normal band.
 
-**Intersection:** Checked overlap between the cleaned movies (5,184) and the normal-band ratings (8,370). Found **841 movies** with both complete metadata and statistically normal rating distributions.
+### Building the Final Sample
 
-**Sampling:** Took a random sample of **100 movies** from these 841 (`random_state=42` for reproducibility).
+With both datasets cleaned, I needed to find the intersection — movies that had both complete metadata AND normal rating distributions. I checked the overlap between my cleaned movies (5,184) and the normal-band rated movies (8,370). The result was **841 movies** that met both criteria.
 
-**Rating aggregation:** For each movie, computed:
-- `avg_rating` — mean rating across all users
+From these 841, I took a random sample of **100 movies** using `random_state=42` for reproducibility.
+
+For each of the 100 movies, I then computed three additional columns from the ratings data:
+- `avg_rating` — the mean rating across all users who rated that movie
 - `rating_count` — total number of ratings
-- `user_ratings` — JSON array of every individual `{userId, rating}` pair (used later for user preference analysis)
+- `user_ratings` — a JSON array containing every individual `{userId, rating}` pair, which I knew I'd need later for user preference analysis
 
-**Output:** Stored in `db/Final_movies.db` as the `Final_movies` table (100 rows × 14 columns).
-
----
-
-### Part 2 — LLM Data Enrichment
-
-> Notebook: `Data_Enrichment.ipynb`
-
-*[PLACEHOLDER — share your enrichment notebook or describe what you did and I'll fill this in]*
+I stored the final dataset in `db/Final_movies.db` as the `Final_movies` table — 100 rows × 14 columns of clean, complete, ratings-enriched movie data ready for LLM enrichment.
 
 ---
 
-## Task 2: Movie System Design
+## Step 2: LLM Data Enrichment
 
-*[PLACEHOLDER]*
+> `Data_Enrich.ipynb`
+
+*[PLACEHOLDER — share your Data_Enrich.ipynb and I'll document it]*
+
+---
+
+## Step 3: Movie System Design
+
+> `Model_Build.ipynb`
+
+*[PLACEHOLDER — share your Model_Build.ipynb and I'll document it]*
 
 ---
 
@@ -92,28 +111,3 @@ https://github.com/user-attachments/assets/acdb0141-daa7-40ca-be27-b72654e20138
 ## Deployment
 
 *[PLACEHOLDER]*
-
----
-
-## Repository Structure
-
-```
-Aetna_Assignment/
-├── README.md
-├── db/
-│   ├── movies.db                  # Original movies database
-│   ├── ratings.db                 # Original ratings database
-│   └── Final_movies.db            # Preprocessed 100-movie sample
-├── Data_Prep.ipynb                # Task 1 Part 1: Preprocessing
-├── Data_Enrichment.ipynb          # Task 1 Part 2: LLM enrichment
-├── Movie_Assistant.ipynb          # Task 2: System design & evaluation
-├── app.py                         # Flask API (deployment)
-├── Dockerfile
-├── requirements.txt
-├── index.html                     # Frontend UI
-├── eval_dataset.json
-├── eval_results.json
-└── k8s/
-    ├── deployment.yaml
-    └── service.yaml
-```
