@@ -153,26 +153,151 @@ I stored the enriched data in two places:
 
 ---
 
-## Step 3: Movie System Design
+## Step 3: Movie System Design, Evaluation & Iteration
 
 > `Model_Build.ipynb`
 
-*[PLACEHOLDER — share your Model_Build.ipynb and I'll document it]*
+### Building the System
 
----
+I used Claude Sonnet 4 via Bedrock as the LLM and connected to the enriched movie data I had stored in Supabase in the previous step. The core design question was: how do I let the model intelligently query a database without writing raw SQL?
 
-## Prompt Engineering
+I created a single tool — `query_table` — that lets the model query the `enriched_movies` table with typed parameters: filters (key-value pairs), limit, order_by, and sort direction. The tool schema description lists every available column and its possible values, so the model knows exactly what data exists and how to filter it.
 
-*[PLACEHOLDER]*
+I then built an agentic conversation loop (`run_conversation`) that lets the model keep calling tools and reasoning in a loop until it has gathered enough information to produce a final answer. For a comparison query, the model might make 2-3 tool calls (one per movie). For recommendations, it makes 1-2 calls with different filters. The loop runs until the model's stop reason is no longer `tool_use` — meaning it's ready to respond.
 
----
+### The Initial System Prompt (V1)
 
-## Model Evaluation
+I wrote a straightforward system prompt that defined three tasks: recommendations, user preference summaries, and comparative analysis. Each section described the expected behavior — use filters, rank by score, compare across metrics, etc. Basic guidelines included "always query the database before answering" and "be concise and structured."
 
-*[PLACEHOLDER]*
+I tested it with a simple query — "Summarize preferences for userId 23" — and the output looked reasonable to my eyes. But I didn't want to rely on human judgment alone. I wanted to verify the model's accuracy systematically.
+
+### Building the Evaluation Pipeline
+
+I needed three things: a dataset to test against, a way to run the model on that dataset, and a way to grade the results.
+
+**Generating the evaluation dataset:** I wrote a function that feeds the complete data snapshot (all 100 movies with key attributes) to Claude and asks it to generate 10 test cases — 3 recommendations, 3 user preferences, 4 comparisons. The critical constraint: the model could only use real titles, real userIds, and real filter values from the snapshot. This prevented evaluating against hallucinated ground truth.
+
+For this generation step, I deliberately did not use tool calling. Instead, I used a different structured extraction technique — **stop sequences with assistant message prefilling**. I prefilled the assistant's response with `` ```json `` and set the stop sequence to `` ``` ``. This forced the model to output only valid JSON between the code fences, with no preamble or explanation. I also set `temperature=1.0` so the generated test cases would be diverse and challenging rather than predictable.
+
+**Model-based grading:** I created a grading function where a separate Claude instance evaluates the main model's output. The grader receives the original query, the model's response, the evaluation criteria, and the complete data snapshot. It scores each response 1–10 with structured feedback: strengths, weaknesses, and reasoning. The grader also uses the stop sequence + prefilling technique for consistent JSON output.
+
+The scoring guide I defined:
+- 9–10: Fully addresses query, accurate data, well structured
+- 7–8: Mostly correct, minor gaps
+- 5–6: Partially correct, missing key elements
+- 1–4: Incorrect, hallucinated data, or missed the query type
+
+### V1 Evaluation Results
+
+| Query Type | Avg Score | Key Issues |
+|-----------|----------|------------|
+| Recommendation | 6.7/10 | Genre mismatches — recommending "Thriller" for "Action" queries |
+| User Preference | 5.0/10 | Fabricated entire user rating profiles with non-existent data |
+| Comparison | 5.2/10 | Hallucinated specific dollar amounts and ROI calculations |
+| **Overall** | **5.6/10** | |
+
+The results were eye-opening. The model was hallucinating heavily — inventing specific budget figures like "$4M" when the database only stores tier labels like "low." It was fabricating user ratings for movies that users never rated. And it was including adjacent genres (Thriller for Action) in recommendations.
+
+### Improving the System Prompt (V2)
+
+Based on the evaluation feedback, I made three targeted improvements:
+
+**1. Anti-hallucination grounding rules:** I added explicit constraints like "NEVER invent or estimate specific dollar amounts for budget or revenue. The database only stores tiers — use those exact labels" and "NEVER calculate ROI, return multiples, or revenue/budget ratios — this data is not available." I also added "Stick strictly to what the database returns — do not supplement with outside knowledge."
+
+**2. Chain-of-thought for user preferences:** The biggest failure was in user preference summaries. The model was confusing `avg_rating` (the global average) with individual user ratings, and fabricating ratings for users who hadn't rated certain movies. I replaced the vague instructions with explicit step-by-step directions:
+- Step 1: Fetch ALL movies (limit=100)
+- Step 2: Parse the `user_ratings` JSON for the specific userId
+- Step 3: Collect only movies this user actually rated
+- Step 4: Split into liked (≥4.0), disliked (≤2.0), neutral
+- Step 5: Summarize patterns
+
+This chain-of-thought approach forced the model to follow a deterministic process rather than guessing.
+
+**3. Strict genre rule:** I added "If the user asks for a specific genre (e.g. 'action'), only recommend movies whose genres field explicitly contains that genre word. Do NOT include movies that are adjacent (e.g. Thriller is not Action)."
+
+### V2 Evaluation Results
+
+| Query Type | V1 Score | V2 Score | Improvement |
+|-----------|---------|---------|-------------|
+| Recommendation | 6.7/10 | 7.0/10 | +0.3 |
+| User Preference | 5.0/10 | 6.0/10 | +1.0 |
+| Comparison | 5.2/10 | 8.5/10 | **+3.3** |
+| **Overall** | **5.6/10** | **7.3/10** | **+1.7** |
+
+The biggest improvement was in comparisons — from 5.2 to 8.5. The grounding rules eliminated the hallucinated financial figures entirely. User preferences improved but remained the hardest task due to the complexity of parsing nested JSON ratings. Recommendations improved slightly with stricter genre matching.
+
+I finalized the V2 system prompt, tool schema, and conversation loop for production deployment.
 
 ---
 
 ## Deployment
 
-*[PLACEHOLDER]*
+> `movie-deploy/`
+
+### Why Deploy?
+
+The assignment asked for a system design. I chose to go further and deploy it end-to-end to demonstrate production-readiness. This also gave me a live URL I could share for demonstration.
+
+### Architecture
+
+```
+Frontend (S3)  →  EKS LoadBalancer  →  2 Flask Pods  →  Bedrock (Claude)
+                                                     →  Supabase (Data)
+```
+
+### Containerization
+
+I wrapped the finalized model, tool, and system prompt into a Flask API with two endpoints: `/health` for Kubernetes probes and `/ask` for queries. I used Gunicorn as the production server with a 120-second timeout (LLM calls can take 30–60 seconds) and 2 workers.
+
+I packaged everything in a Docker image using `python:3.11-slim` as the base and built with `--platform linux/amd64` since my Mac uses ARM but EKS nodes run x86.
+
+### Kubernetes (EKS)
+
+I deployed the image to an EKS cluster with 2 `t3.medium` worker nodes. The deployment runs 2 pod replicas behind an AWS LoadBalancer for fault tolerance and load distribution. I configured liveness and readiness probes on the `/health` endpoint to ensure automatic recovery if a pod crashes. Sensitive configuration (the Supabase key) is stored as a Kubernetes Secret rather than hardcoded.
+
+I attached IAM policies to the node role for Bedrock access (LLM calls) and ECR access (pulling the Docker image).
+
+### Frontend
+
+I built a simple HTML/CSS/JS frontend and hosted it on S3 as a static website. It calls the EKS API endpoint, renders responses as formatted Markdown, and includes pre-built example queries from the highest-scoring evaluation results. I added `flask-cors` to the API to handle cross-origin requests between the S3 domain and EKS domain.
+
+### Deployment Flow
+
+```
+1. docker build --platform linux/amd64     →  Local image
+2. docker push to ECR                      →  Image in AWS registry
+3. eksctl create cluster                   →  EKS cluster (2 nodes)
+4. Attach IAM policies                     →  Bedrock + ECR access
+5. kubectl create secret                   →  Supabase credentials
+6. kubectl apply deployment + service      →  Pods running + LoadBalancer
+7. aws s3 cp index.html                    →  Frontend live on S3
+```
+
+---
+
+## Design Decisions
+
+**Forced tool calling for enrichment vs auto tool calling for queries:** During data enrichment (Step 2), I forced the model to always call the `movie_enrichment` tool to guarantee structured output. During the query system (Step 3), I used `auto` tool choice so the model could decide when and how many times to query the database. Different tasks require different levels of autonomy.
+
+**Stop sequences + prefilling vs tool calling for evaluation:** For generating the eval dataset and grading responses, I used stop sequences with assistant message prefilling instead of tool calling. This was a deliberate choice — these tasks needed free-form JSON output with variable structure, which is better suited to stop-sequence extraction than rigid tool schemas.
+
+**Supabase REST API over SQLite in production:** The assignment provided SQLite, but containers are ephemeral — bundling a database file into a Docker image is fragile. Supabase gave me a cloud-hosted PostgreSQL database accessible via REST API from anywhere, which made the transition from notebook to deployed API seamless.
+
+**Single flexible tool vs multiple specialized tools:** I gave the model one `query_table` tool with flexible filters, ordering, and limits rather than separate tools for recommendations, comparisons, and preferences. This reduced tool schema complexity and let the model compose its own query patterns rather than being locked into predefined paths.
+
+**Model-based evaluation over manual testing:** I could have manually tested 10 queries and eyeballed the results. Instead, I automated the entire evaluation pipeline — dataset generation, model execution, and grading — all powered by Claude. This made the process reproducible, scalable, and objective.
+
+---
+
+## Technologies Used
+
+| Layer | Technology | Purpose |
+|-------|-----------|---------|
+| LLM | Claude Sonnet 4 via AWS Bedrock | Reasoning, enrichment, recommendations, grading |
+| Database | Supabase (PostgreSQL) | Movie data storage and REST API |
+| Compute | Amazon SageMaker | Notebook development and testing |
+| Backend | Flask + Gunicorn | REST API serving |
+| Container | Docker + AWS ECR | Image packaging and registry |
+| Orchestration | AWS EKS (Kubernetes) | Container deployment with scaling |
+| Frontend | HTML/CSS/JS + AWS S3 | Static website hosting |
+| IAM | AWS IAM | Permissions for Bedrock and ECR |
