@@ -82,7 +82,7 @@ I stored the final dataset in `db/Final_movies.db` as the `Final_movies` table â
 
 ## Step 2: LLM Data Enrichment
 
-> `Data_Enrich.ipynb`
+2. [Data_Enrich.ipynb](https://github.com/manojkolluri/Aetna_Assignment/blob/main/Data_Enrich.ipynb)
 
 With the clean 100-movie dataset ready, I needed to generate 5 new attributes for each movie using an LLM. The attributes I chose were:
 
@@ -155,7 +155,7 @@ I stored the enriched data in two places:
 
 ## Step 3: Movie System Design, Evaluation & Iteration
 
-> `Model_Build.ipynb`
+3. [Model_Build.ipynb](https://github.com/manojkolluri/Aetna_Assignment/blob/main/Model_Build.ipynb)
 
 ### Building the System
 
@@ -233,7 +233,7 @@ I finalized the V2 system prompt, tool schema, and conversation loop for product
 
 ## Step 4: Deployment
 
-> `movie-deploy/`
+4. [movie-deploy/](https://github.com/manojkolluri/Aetna_Assignment/tree/main/movie-deploy)
 
 
 ### Architecture
