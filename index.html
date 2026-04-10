@@ -96,10 +96,17 @@
     border: 1px solid rgba(255, 255, 255, 0.1);
     padding: 24px;
     border-radius: 16px;
-    line-height: 1.6;
-    white-space: pre-wrap;
+    line-height: 1.7;
     min-height: 100px;
   }
+  .response h2 { font-size: 1.3rem; color: #f5af19; margin: 20px 0 10px 0; }
+  .response h3 { font-size: 1.1rem; color: #e0a030; margin: 16px 0 8px 0; }
+  .response h4 { font-size: 1rem; color: #ccc; margin: 12px 0 6px 0; }
+  .response strong { color: #f5af19; }
+  .response ul, .response ol { padding-left: 20px; margin: 8px 0; }
+  .response li { margin: 4px 0; }
+  .response p { margin: 8px 0; }
+  .response hr { border: none; border-top: 1px solid rgba(255,255,255,0.1); margin: 16px 0; }
   .response.empty {
     color: #555;
     text-align: center;
@@ -138,10 +145,10 @@
   </header>
 
   <div class="examples">
+    <div class="example" onclick="setQuery(this.textContent)">Show me blockbuster movies with low budget that performed really well</div>
     <div class="example" onclick="setQuery(this.textContent)">Recommend action movies with positive sentiment</div>
-    <div class="example" onclick="setQuery(this.textContent)">Summarize preferences for userId 23</div>
-    <div class="example" onclick="setQuery(this.textContent)">Compare Mr. Deeds vs Toy Story</div>
-    <div class="example" onclick="setQuery(this.textContent)">Top family movies with high revenue</div>
+    <div class="example" onclick="setQuery(this.textContent)">Compare the effectiveness of Dog Day Afternoon versus Heat</div>
+    <div class="example" onclick="setQuery(this.textContent)">Which performed better financially: Dirty Harry or North by Northwest?</div>
   </div>
 
   <div class="input-area">
@@ -158,6 +165,7 @@
   </footer>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script>
   const API_URL = "http://a623da9515ac547dfa84556caa73f711-1418076793.us-west-2.elb.amazonaws.com";
 
@@ -183,9 +191,9 @@
         body: JSON.stringify({ query })
       });
       const data = await response.json();
-      responseDiv.textContent = data.answer || data.error || "No response";
+      responseDiv.innerHTML = marked.parse(data.answer || data.error || "No response");
     } catch (err) {
-      responseDiv.textContent = "Error: " + err.message;
+      responseDiv.innerHTML = "<p>Error: " + err.message + "</p>";
     } finally {
       askBtn.disabled = false;
     }
