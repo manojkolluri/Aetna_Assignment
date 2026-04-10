@@ -31,7 +31,7 @@ Aetna_Assignment/
 
 ## Step 1: Data Preprocessing
 
-1. [Data_Prep.ipynb](https://github.com/manojkolluri/Aetna_Assignment/blob/main/Data_Prep.ipynb)
+[Data_Prep.ipynb](https://github.com/manojkolluri/Aetna_Assignment/blob/main/Data_Prep.ipynb)
 
 I started by importing both datasets — `movies.db` (45,430 movies × 12 columns) and `ratings.db` (100,004 ratings × 5 columns). Since the task only required a sample of 50–100 movies, I decided early on that the best strategy was aggressive noise elimination rather than backfilling. With 45K records to work with, I had more than enough headroom to drop anything imperfect and still end up with a clean, high-quality sample.
 
@@ -82,7 +82,7 @@ I stored the final dataset in `db/Final_movies.db` as the `Final_movies` table �
 
 ## Step 2: LLM Data Enrichment
 
-2. [Data_Enrich.ipynb](https://github.com/manojkolluri/Aetna_Assignment/blob/main/Data_Enrich.ipynb)
+[Data_Enrich.ipynb](https://github.com/manojkolluri/Aetna_Assignment/blob/main/Data_Enrich.ipynb)
 
 With the clean 100-movie dataset ready, I needed to generate 5 new attributes for each movie using an LLM. The attributes I chose were:
 
@@ -155,7 +155,7 @@ I stored the enriched data in two places:
 
 ## Step 3: Movie System Design, Evaluation & Iteration
 
-3. [Model_Build.ipynb](https://github.com/manojkolluri/Aetna_Assignment/blob/main/Model_Build.ipynb)
+[Model_Build.ipynb](https://github.com/manojkolluri/Aetna_Assignment/blob/main/Model_Build.ipynb)
 
 ### Building the System
 
@@ -233,7 +233,7 @@ I finalized the V2 system prompt, tool schema, and conversation loop for product
 
 ## Step 4: Deployment
 
-4. [movie-deploy/](https://github.com/manojkolluri/Aetna_Assignment/tree/main/movie-deploy)
+[movie-deploy/](https://github.com/manojkolluri/Aetna_Assignment/tree/main/movie-deploy)
 
 
 ### Architecture
