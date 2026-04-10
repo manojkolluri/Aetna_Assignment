@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: movie-assistant
+  labels:
+    app: movie-assistant
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: movie-assistant
+  template:
+    metadata:
+      labels:
+        app: movie-assistant
+    spec:
+      containers:
+        - name: movie-assistant
+          image: 515105386417.dkr.ecr.us-west-2.amazonaws.com/movie-assistant:latest
+          ports:
+            - containerPort: 8080
+          env:
+            - name: SUPABASE_URL
+              value: "https://zqvjzukfbfcixxaplzyp.supabase.co"
+            - name: SUPABASE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: movie-assistant-secrets
+                  key: supabase-key
+            - name: AWS_REGION
+              value: "us-west-2"
+            - name: MODEL_ID
+              value: "global.anthropic.claude-sonnet-4-20250514-v1:0"
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10

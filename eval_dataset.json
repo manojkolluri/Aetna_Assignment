@@ -1,0 +1,52 @@
+[
+  {
+    "query": "Recommend action movies with positive sentiment",
+    "query_type": "recommendation",
+    "solution_criteria": "Must recommend action movies with positive sentiment from the database. Should include movies like 'Lethal Weapon 2', 'Indiana Jones and the Last Crusade', and 'The Brothers Grimm' which all have Action genre and positive sentiment."
+  },
+  {
+    "query": "Find me some horror movies that are suitable for families",
+    "query_type": "recommendation",
+    "solution_criteria": "Must recommend horror movies with family audience appeal. Should include 'Poltergeist' which is the only horror movie in the database with 'family' audience appeal."
+  },
+  {
+    "query": "Show me blockbuster movies with low budget that performed really well",
+    "query_type": "recommendation",
+    "solution_criteria": "Must recommend movies with 'blockbuster' revenue tier and 'low' budget tier. Should include movies like 'Grease', 'Saw', and 'Dirty Dancing' which all achieved blockbuster status despite low budgets."
+  },
+  {
+    "query": "Summarize the movie preferences for user 564",
+    "query_type": "user_preference",
+    "solution_criteria": "Must analyze preferences for userId 564 based on their rated movies: 'Grease' (Romance, positive, family), 'The Wizard' (Adventure/Comedy/Drama/Family/Romance, positive, family), 'Open Range' (Western, neutral, adult), 'The Birds' (Horror, negative, adult), 'Jackie Brown' (Comedy/Crime/Romance, neutral, adult), and 'Face/Off' (Action/Crime/Science Fiction/Thriller, neutral, adult). Should identify genre preferences, sentiment patterns, and audience appeal trends."
+  },
+  {
+    "query": "What are the viewing patterns for userId 15?",
+    "query_type": "user_preference",
+    "solution_criteria": "Must analyze preferences for userId 15 based on their extensive movie list including 'Saw', 'The 40 Year Old Virgin', 'Horrible Bosses', 'The Man Who Knew Too Much', 'Snatch', 'Scream', 'Sabrina', 'The Elephant Man', 'No Reservations', 'The Happening', 'Day Watch', 'This Is 40', 'Hot Fuzz', 'Rumble Fish', 'The Legend of Bagger Vance', 'Southland Tales', and 'All the King's Men'. Should identify strong preference for adult-targeted content, diverse genre interests, and mixed sentiment tolerance."
+  },
+  {
+    "query": "Analyze the movie tastes of user 30",
+    "query_type": "user_preference",
+    "solution_criteria": "Must analyze preferences for userId 30 based on movies: 'Seabiscuit' (Drama/History, positive, general), 'The Elephant Man' (Drama/History, neutral, adult), 'No Reservations' (Comedy, positive, general), 'Day Watch' (Fantasy/Horror, neutral, adult), 'Planet of the Apes' (Thriller/Science Fiction/Action/Adventure, negative, general), 'The Whole Ten Yards' (Comedy/Thriller/Crime, neutral, adult), 'Little Children' (Romance/Drama, negative, adult), 'The Legend of Bagger Vance' (Fantasy/Drama, neutral, adult), 'The Believer' (Drama, negative, adult), 'Rendition' (Drama/Thriller, negative, adult), and 'Manderlay' (Drama, negative, adult). Should note strong preference for dramas, adult content, and tolerance for negative sentiment."
+  },
+  {
+    "query": "Compare The Mask vs Grease in terms of budget and box office performance",
+    "query_type": "comparison",
+    "solution_criteria": "Must compare 'The Mask' (medium budget, blockbuster revenue) vs 'Grease' (low budget, blockbuster revenue). Should highlight that both achieved blockbuster status but Grease did so with a lower budget, making it more cost-effective. May also mention production effectiveness scores (both 95) and different audience appeals (general vs family)."
+  },
+  {
+    "query": "How do Saw and Scream compare on production effectiveness and audience ratings?",
+    "query_type": "comparison",
+    "solution_criteria": "Must compare 'Saw' vs 'Scream' on production effectiveness scores (both 90 and 75 respectively) and average ratings (3.78 vs 2.79). Should note that Saw performed better in both metrics despite both being horror movies with negative sentiment. May also compare their revenue performance (both blockbusters) and audience appeal (both teen/adult)."
+  },
+  {
+    "query": "Compare the effectiveness of Dog Day Afternoon versus Heat",
+    "query_type": "comparison",
+    "solution_criteria": "Must compare 'Dog Day Afternoon' (production effectiveness 95, low budget, hit revenue) vs 'Heat' (production effectiveness 80, high budget, blockbuster revenue). Should note that Dog Day Afternoon achieved higher production effectiveness with much lower budget, while Heat achieved higher revenue with its larger budget investment."
+  },
+  {
+    "query": "Which performed better financially: Dirty Harry or North by Northwest?",
+    "query_type": "comparison",
+    "solution_criteria": "Must compare 'Dirty Harry' vs 'North by Northwest' on financial performance. Both had 'average' revenue tier and 'low' budget tier, so they performed similarly financially. Should note both achieved the same revenue tier with the same budget level, though may mention differences in ratings (4.5 vs 4.22) and production effectiveness (85 vs 85)."
+  }
+]
