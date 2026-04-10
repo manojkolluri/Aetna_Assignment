@@ -31,7 +31,7 @@ Aetna_Assignment/
 
 ## Step 1: Data Preprocessing
 
-> `Data_Prep.ipynb`
+> [Data_Prep.ipynb](https://github.com/manojkolluri/Aetna_Assignment/blob/main/Data_Prep.ipynb)
 
 I started by importing both datasets — `movies.db` (45,430 movies × 12 columns) and `ratings.db` (100,004 ratings × 5 columns). Since the task only required a sample of 50–100 movies, I decided early on that the best strategy was aggressive noise elimination rather than backfilling. With 45K records to work with, I had more than enough headroom to drop anything imperfect and still end up with a clean, high-quality sample.
 
