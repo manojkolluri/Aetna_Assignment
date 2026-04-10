@@ -229,14 +229,12 @@ The biggest improvement was in comparisons — from 5.2 to 8.5. The grounding ru
 I finalized the V2 system prompt, tool schema, and conversation loop for production deployment.
 
 ---
+---
 
-## Deployment
+## Step 4: Deployment
 
 > `movie-deploy/`
 
-### Why Deploy?
-
-The assignment asked for a system design. I chose to go further and deploy it end-to-end to demonstrate production-readiness. This also gave me a live URL I could share for demonstration.
 
 ### Architecture
 
