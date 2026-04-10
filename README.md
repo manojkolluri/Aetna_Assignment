@@ -275,7 +275,7 @@ I built a simple HTML/CSS/JS frontend and hosted it on S3 as a static website. I
 
 ---
 
-## Design Decisions
+## Key Design Decisions
 
 **Forced tool calling for enrichment vs auto tool calling for queries:** During data enrichment (Step 2), I forced the model to always call the `movie_enrichment` tool to guarantee structured output. During the query system (Step 3), I used `auto` tool choice so the model could decide when and how many times to query the database. Different tasks require different levels of autonomy.
 
