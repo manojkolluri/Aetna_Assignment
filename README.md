@@ -84,7 +84,72 @@ I stored the final dataset in `db/Final_movies.db` as the `Final_movies` table �
 
 > `Data_Enrich.ipynb`
 
-*[PLACEHOLDER — share your Data_Enrich.ipynb and I'll document it]*
+With the clean 100-movie dataset ready, I needed to generate 5 new attributes for each movie using an LLM. The attributes I chose were:
+
+- **sentiment** — tone of the movie overview (positive / negative / neutral)
+- **budget_tier** — low (<$10M), medium ($10M–$50M), high ($50M–$100M), blockbuster (>$100M)
+- **revenue_tier** — flop (<$10M), average ($10M–$50M), hit ($50M–$100M), blockbuster (>$100M)
+- **production_effectiveness_score** — a 0–100 composite score based on ROI (revenue/budget) and avg_rating. High ROI + high rating = 90–100, low ROI + low rating = 0–20.
+- **audience_appeal** — inferred target audience based on overview and genres (family / teen / adult / general)
+
+### The Design Challenge
+
+I needed the LLM to produce structured, consistent output for all 100 movies. Three problems to solve:
+
+1. **Consistency** — the model had to return the exact same schema every time, no variation in field names or formats.
+2. **Scale** — calling the API 100 times individually would be slow and expensive. But sending all 100 movies in a single prompt risked hitting token limits and degraded output quality.
+3. **Reliability** — the model might sometimes respond in plain text instead of structured data.
+
+### My Solution: Forced Tool Calling
+
+I solved all three problems with a single design decision: **forced tool call invocation**. Instead of asking the model to return JSON in a text response (which can be inconsistent), I defined a `movie_enrichment` tool schema and forced the model to always call it. This guaranteed structured output with typed fields and enum constraints every time.
+
+The tool schema I defined had strict types — `sentiment` was constrained to `["positive", "negative", "neutral"]`, `budget_tier` to `["low", "medium", "high", "blockbuster"]`, and so on. The model couldn't deviate because the tool schema enforced it.
+
+I set `tool_choice="movie_enrichment"` (not `"auto"`) which forced Claude to always invoke the tool rather than responding with plain text. Combined with `temperature=0.0` for deterministic output, this gave me completely consistent enrichment across all 100 movies.
+
+### Batch Processing
+
+I split the 100 movies into batches of 10 and processed them sequentially — 10 batches total. For each batch, I formatted the movie data inside XML tags (`<movie_data>...</movie_data>`) with a clear, direct prompt:
+
+```
+You are a movie data analyst. Analyze the movies below and enrich each one with 5 attributes.
+
+Guidelines:
+- sentiment: Analyze the overview tone (positive/negative/neutral)
+- budget_tier: low (<$10M), medium ($10M-$50M), high ($50M-$100M), blockbuster (>$100M)
+- revenue_tier: flop (<$10M), average ($10M-$50M), hit ($50M-$100M), blockbuster (>$100M)
+- production_effectiveness_score: 0-100 score. Consider ROI and avg_rating together.
+- audience_appeal: Based on overview and genres (family/teen/adult/general)
+
+<movie_data>
+  Movie ID: 2022
+  Title: Mr. Deeds
+  Overview: When Longfellow Deeds...
+  Budget: $50,000,000
+  Revenue: $171,269,535
+  Avg Rating: 3.42 / 5.0
+  Genres: Comedy, Romance
+  ---
+  ... (9 more movies)
+</movie_data>
+
+Analyse all 10 movies and call the movie_enrichment tool.
+```
+
+The system prompt reinforced the tool-only behavior: *"You are a movie data analyst. Always call the movie_enrichment tool with your analysis. Never respond with plain text."*
+
+I added a 1-second sleep between batches to avoid rate limiting.
+
+### Results
+
+All 10 batches processed successfully — 100/100 movies enriched with zero nulls across all 5 new columns. The enriched data (100 rows × 6 columns: movieId + 5 new attributes) was merged back into the original dataset, creating a final table of 100 rows × 19 columns.
+
+### Storage
+
+I stored the enriched data in two places:
+1. **SQLite** (`db/enriched_movies.db`) — for local reference and notebook access
+2. **Supabase (PostgreSQL)** — uploaded in batches of 10 via REST API, so the data would be easily accessible when I deployed the application later. This was a deliberate decision: I knew I'd be building an API that needed to query this data from a container, and a cloud-hosted database made that seamless without bundling SQLite files into Docker images.
 
 ---
 
